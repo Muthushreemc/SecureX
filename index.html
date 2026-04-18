@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FraudSentinel</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#080b10; --bg2:#0d1219; --bg3:#121820;
+  --border:#1e2a38; --border2:#253347;
+  --text:#c8d4e0; --text2:#5e7a96; --text3:#3a5068;
+  --red:#ff3b5c; --rdim:rgba(255,59,92,.13);
+  --amber:#f59e0b; --adim:rgba(245,158,11,.11);
+  --green:#10d07a; --gdim:rgba(16,208,122,.11);
+  --blue:#38bdf8; --bdim:rgba(56,189,248,.09);
+  --purple:#a78bfa;
+  --mono:'Space Mono',monospace;
+  --sans:'DM Sans',sans-serif;
+}
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; overflow-x:hidden; }
+
+/* scanlines */
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);
+}
+
+/* HEADER */
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 28px; height:56px;
+  background:var(--bg2); border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:100;
+}
+.logo { display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:13px; font-weight:700; letter-spacing:.08em; color:#fff; }
+.logo-icon { width:28px; height:28px; background:var(--red); clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; font-weight:700; }
+.hright { display:flex; align-items:center; gap:16px; }
+.live-badge { display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11px; color:var(--green); }
+.pdot { width:7px; height:7px; background:var(--green); border-radius:50%; animation:pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.7; transform:scale(.9); } }
+.clock { font-family:var(--mono); font-size:12px; color:var(--text2); }
+.mbadge { font-family:var(--mono); font-size:10px; padding:3px 10px; border-radius:2px; letter-spacing:.05em; }
+.mbadge.ml { background:var(--gdim); color:var(--green); border:1px solid rgba(16,208,122,.2); }
+.mbadge.rb { background:var(--adim); color:var(--amber); border:1px solid rgba(245,158,11,.2); }
+
+/* NAV TABS */
+.nav-tabs { display:flex; background:var(--bg2); border-bottom:1px solid var(--border); padding:0 28px; }
+.tab-btn { font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:14px 20px; border:none; background:transparent; color:var(--text3); cursor:pointer; border-bottom:2px solid transparent; transition:all .2s; position:relative; top:1px; }
+.tab-btn:hover { color:var(--text2); }
+.tab-btn.active { color:var(--blue); border-bottom-color:var(--blue); }
+
+/* TAB PANELS */
+.tab-panel { display:none; padding:24px 28px; max-width:1600px; margin:0 auto; }
+.tab-panel.active { display:block; }
+
+/* PANEL CARD */
+.panel { background:var(--bg2); border:1px solid var(--border); border-radius:4px; overflow:hidden; margin-bottom:16px; }
+.ph { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--border); }
+.pt { font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text2); }
+.pb { font-family:var(--mono); font-size:10px; padding:2px 8px; border-radius:2px; }
+.pb.r { background:var(--rdim); color:var(--red); }
+.pb.g { background:var(--gdim); color:var(--green); }
+.pb.b { background:var(--bdim); color:var(--blue); }
+.pb.a { background:var(--adim); color:var(--amber); }
+
+/* METRIC CARDS */
+.mrow { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
+.mc { background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:18px 20px 16px; position:relative; overflow:hidden; }
+.mc::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.mc.bl::before { background:var(--blue); } .mc.gr::before { background:var(--green); }
+.mc.re::before { background:var(--red); }  .mc.am::before { background:var(--amber); }
+.mc.pu::before { background:var(--purple); }
+.mlabel { font-size:10px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); margin-bottom:10px; font-family:var(--mono); }
+.mval { font-family:var(--mono); font-size:26px; font-weight:700; color:#fff; line-height:1; }
+.mc.re .mval { color:var(--red); } .mc.am .mval { color:var(--amber); } .mc.gr .mval { color:var(--green); }
+.msub { font-size:11px; color:var(--text3); margin-top:6px; font-family:var(--mono); }
+.msub span { color:var(--text2); }
+
+/* CHART */
+.ca { padding:20px; }
+.bchart { display:flex; align-items:flex-end; gap:3px; height:120px; width:100%; }
+.bwrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+.bar { width:100%; min-height:2px; border-radius:2px 2px 0 0; transition:height .5s ease; cursor:pointer; position:relative; }
+.bar:hover::after { content:attr(data-tip); position:absolute; bottom:105%; left:50%; transform:translateX(-50%); background:#1a2535; border:1px solid var(--border2); color:var(--text); font-family:var(--mono); font-size:10px; padding:3px 7px; border-radius:2px; white-space:nowrap; z-index:10; }
+.bar.allow { background:var(--green); opacity:.7; } .bar.flag { background:var(--amber); } .bar.block { background:var(--red); }
+.bar:hover { opacity:1 !important; }
+.cax { display:flex; justify-content:space-between; padding:6px 0 0; font-family:var(--mono); font-size:9px; color:var(--text3); }
+.cleg { display:flex; gap:16px; padding:14px 20px 0; border-top:1px solid var(--border); margin-top:14px; }
+.li { display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:10px; color:var(--text2); }
+.ld { width:8px; height:8px; border-radius:1px; }
+
+/* ALERTS */
+.alist { overflow-y:auto; max-height:220px; }
+.aitem { display:flex; align-items:flex-start; padding:12px 16px; border-bottom:1px solid var(--border); gap:10px; }
+.aitem:hover { background:rgba(255,59,92,.04); }
+.aitem:last-child { border-bottom:none; }
+.aicon { width:24px; height:24px; flex-shrink:0; border-radius:2px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; font-family:var(--mono); }
+.aicon.block { background:var(--rdim); color:var(--red); } .aicon.flag { background:var(--adim); color:var(--amber); }
+.abody { flex:1; min-width:0; }
+.amerch { font-size:12px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.adetail { font-family:var(--mono); font-size:10px; color:var(--text2); margin-top:2px; }
+.ascore { font-family:var(--mono); font-size:12px; font-weight:700; flex-shrink:0; }
+.ascore.block { color:var(--red); } .ascore.flag { color:var(--amber); }
+
+/* TABLE */
+.mid { display:grid; grid-template-columns:1fr 340px; gap:16px; margin-bottom:16px; }
+.tcontrols { display:flex; align-items:center; gap:12px; padding:12px 20px; border-bottom:1px solid var(--border); }
+.fbtn { font-family:var(--mono); font-size:10px; letter-spacing:.05em; padding:5px 12px; border-radius:2px; border:1px solid var(--border); background:transparent; color:var(--text2); cursor:pointer; transition:all .15s; }
+.fbtn:hover, .fbtn.active { border-color:var(--blue); color:var(--blue); background:var(--bdim); }
+.fbtn.ar { border-color:var(--red);   color:var(--red);   background:var(--rdim); }
+.fbtn.aa { border-color:var(--amber); color:var(--amber); background:var(--adim); }
+.fbtn.ag { border-color:var(--green); color:var(--green); background:var(--gdim); }
+.srch { margin-left:auto; background:var(--bg3); border:1px solid var(--border); border-radius:2px; padding:5px 12px; font-family:var(--mono); font-size:11px; color:var(--text); width:200px; outline:none; transition:border-color .15s; }
+.srch:focus { border-color:var(--blue); }
+.srch::placeholder { color:var(--text3); }
+.txntable { width:100%; border-collapse:collapse; font-size:12px; }
+.txntable thead tr { border-bottom:1px solid var(--border); }
+.txntable th { font-family:var(--mono); font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); padding:10px 16px; text-align:left; white-space:nowrap; }
+.txntable tbody tr { border-bottom:1px solid var(--border); transition:background .1s; }
+.txntable tbody tr:hover { background:rgba(255,255,255,.02); }
+.txntable tbody tr.ib { background:rgba(255,59,92,.04); }
+.txntable tbody tr.ib:hover { background:rgba(255,59,92,.07); }
+.txntable tbody tr.if2 { background:rgba(245,158,11,.03); }
+.txntable td { padding:10px 16px; color:var(--text); white-space:nowrap; }
+.txntable td.mono { font-family:var(--mono); font-size:11px; }
+.txntable td.dim { color:var(--text2); font-family:var(--mono); font-size:11px; }
+.tscroll { overflow-y:auto; max-height:400px; }
+.tscroll::-webkit-scrollbar, .alist::-webkit-scrollbar, .crs::-webkit-scrollbar { width:4px; }
+.tscroll::-webkit-scrollbar-thumb, .alist::-webkit-scrollbar-thumb, .crs::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+.dp { display:inline-flex; align-items:center; font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:.06em; padding:3px 9px; border-radius:2px; }
+.dp.block { background:var(--rdim); color:var(--red); }
+.dp.flag  { background:var(--adim); color:var(--amber); }
+.dp.allow { background:var(--gdim); color:var(--green); }
+.sbc { display:flex; align-items:center; gap:8px; }
+.str { width:60px; height:4px; background:var(--bg3); border-radius:2px; overflow:hidden; }
+.sfill { height:100%; border-radius:2px; transition:width .4s ease; }
+.snum { font-family:var(--mono); font-size:11px; min-width:36px; text-align:right; }
+.es { padding:40px; text-align:center; font-family:var(--mono); font-size:12px; color:var(--text3); }
+
+/* MANUAL DETECTION FORM */
+.dg { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.fsec { background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:24px; margin-bottom:14px; }
+.ftitle { font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text2); margin-bottom:20px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+.fgrid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.fgrp { display:flex; flex-direction:column; gap:6px; }
+.flabel { font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text3); }
+.finput, .fsel { background:var(--bg3); border:1px solid var(--border); border-radius:3px; padding:9px 12px; font-family:var(--mono); font-size:12px; color:var(--text); outline:none; transition:border-color .15s; width:100%; }
+.finput:focus, .fsel:focus { border-color:var(--blue); }
+.fsel option { background:var(--bg3); }
+.finput::placeholder { color:var(--text3); }
+.dbtn { width:100%; margin-top:18px; padding:12px; font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; background:var(--blue); color:#000; border:none; border-radius:3px; cursor:pointer; transition:all .2s; }
+.dbtn:hover { background:#60cbff; transform:translateY(-1px); }
+.dbtn:active { transform:translateY(0); }
+.dbtn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+
+/* RESULT CARD */
+.rcard { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:20px; position:relative; overflow:hidden; }
+.rcard.block { border-color:rgba(255,59,92,.4); background:rgba(255,59,92,.04); }
+.rcard.flag  { border-color:rgba(245,158,11,.4); background:rgba(245,158,11,.03); }
+.rcard.allow { border-color:rgba(16,208,122,.3); background:rgba(16,208,122,.03); }
+.rcard::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+.rcard.block::before { background:var(--red); }
+.rcard.flag::before  { background:var(--amber); }
+.rcard.allow::before { background:var(--green); }
+.rverdict { display:flex; align-items:center; gap:16px; margin-bottom:16px; }
+.vicon { width:48px; height:48px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; font-family:var(--mono); flex-shrink:0; }
+.vicon.block { background:var(--rdim); color:var(--red); }
+.vicon.flag  { background:var(--adim); color:var(--amber); }
+.vicon.allow { background:var(--gdim); color:var(--green); }
+.vdecision { font-family:var(--mono); font-size:22px; font-weight:700; }
+.vdecision.block { color:var(--red); }
+.vdecision.flag  { color:var(--amber); }
+.vdecision.allow { color:var(--green); }
+.sdisp { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.sbig { font-family:var(--mono); font-size:36px; font-weight:700; line-height:1; }
+.sbbar { flex:1; height:8px; background:var(--bg); border-radius:4px; overflow:hidden; }
+.sbfill { height:100%; border-radius:4px; transition:width .6s ease; }
+.rrow { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+.ri { background:var(--bg2); border:1px solid var(--border); border-radius:3px; padding:10px 12px; }
+.rilabel { font-family:var(--mono); font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:var(--text3); margin-bottom:4px; }
+.rival { font-family:var(--mono); font-size:12px; color:var(--text); }
+.flist { background:var(--bg2); border:1px solid var(--border); border-radius:3px; padding:12px; }
+.flist-title { font-family:var(--mono); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); margin-bottom:8px; }
+.ftag { display:inline-block; background:var(--adim); color:var(--amber); font-family:var(--mono); font-size:10px; padding:3px 8px; border-radius:2px; margin:2px; }
+.ftag.ok { background:var(--gdim); color:var(--green); }
+.placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:300px; color:var(--text3); font-family:var(--mono); font-size:12px; gap:12px; border:1px dashed var(--border); border-radius:4px; }
+
+/* PRESETS */
+.presets { display:flex; flex-wrap:wrap; gap:8px; }
+.pbtn { font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:9px 20px; border-radius:3px; border:none; cursor:pointer; transition:all .2s; }
+.pbtn.primary { background:var(--blue); color:#000; }
+.pbtn.primary:hover { background:#60cbff; }
+.pbtn.secondary { background:transparent; color:var(--text2); border:1px solid var(--border); }
+.pbtn.secondary:hover { border-color:var(--text2); }
+.pbtn:disabled { opacity:.4; cursor:not-allowed; }
+
+/* CSV UPLOAD */
+.uzone { border:2px dashed var(--border2); border-radius:4px; padding:32px; text-align:center; cursor:pointer; transition:all .2s; background:var(--bg3); }
+.uzone:hover, .uzone.drag { border-color:var(--blue); background:var(--bdim); }
+.uzone input[type=file] { display:none; }
+.ccontrols { display:flex; align-items:center; gap:10px; margin-top:12px; }
+.cfname { font-family:var(--mono); font-size:11px; color:var(--text2); flex:1; }
+.csum { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:16px; }
+.cstat { background:var(--bg2); border:1px solid var(--border); border-radius:3px; padding:12px; text-align:center; }
+.cstatval { font-family:var(--mono); font-size:20px; font-weight:700; color:#fff; }
+.cstatval.r { color:var(--red); } .cstatval.a { color:var(--amber); } .cstatval.g { color:var(--green); }
+.cstatlabel { font-family:var(--mono); font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:var(--text3); margin-top:4px; }
+.crs { overflow-y:auto; max-height:380px; }
+.pbar { height:3px; background:var(--border); border-radius:2px; overflow:hidden; margin-top:8px; }
+.pfill { height:100%; background:var(--blue); border-radius:2px; transition:width .3s ease; }
+
+/* STATUS BAR */
+.statusbar { display:flex; align-items:center; gap:20px; padding:10px 28px; border-top:1px solid var(--border); font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:.04em; background:var(--bg2); position:fixed; bottom:0; left:0; right:0; z-index:50; }
+.statusbar span { color:var(--text2); }
+
+/* RESPONSIVE */
+@media (max-width:1100px) {
+  .mrow { grid-template-columns:repeat(3,1fr); }
+  .mid  { grid-template-columns:1fr; }
+  .dg   { grid-template-columns:1fr; }
+}
+@media (max-width:700px) {
+  .mrow  { grid-template-columns:repeat(2,1fr); }
+  .fgrid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">FS</div>
+    FRAUDSENTINEL
+  </div>
+  <div class="hright">
+    <div id="mbadge" class="mbadge rb">RULE-BASED MODE</div>
+    <div class="live-badge"><div class="pdot"></div>LIVE</div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<!-- NAV -->
+<div class="nav-tabs">
+  <button class="tab-btn active" onclick="switchTab('live',this)">&#9632; Live Monitor</button>
+  <button class="tab-btn" onclick="switchTab('manual',this)">&#10010; Manual Detection</button>
+  <button class="tab-btn" onclick="switchTab('batch',this)">&#8679; Batch CSV Upload</button>
+</div>
+
+<!-- ========== TAB 1: LIVE MONITOR ========== -->
+<div id="tab-live" class="tab-panel active">
+
+  <div class="mrow">
+    <div class="mc bl"><div class="mlabel">Total Scored</div><div class="mval" id="m-total">-</div><div class="msub">last <span id="m-win">-</span> txns</div></div>
+    <div class="mc re"><div class="mlabel">Blocked</div><div class="mval" id="m-blocked">-</div><div class="msub"><span id="m-bpct">-</span> block rate</div></div>
+    <div class="mc am"><div class="mlabel">Flagged</div><div class="mval" id="m-flagged">-</div><div class="msub"><span id="m-fpct">-</span> flag rate</div></div>
+    <div class="mc gr"><div class="mlabel">Allowed</div><div class="mval" id="m-allowed">-</div><div class="msub"><span id="m-apct">-</span> pass rate</div></div>
+    <div class="mc pu"><div class="mlabel">Avg Score</div><div class="mval" id="m-avg">-</div><div class="msub">fraud probability</div></div>
+  </div>
+
+  <div class="mid">
+    <div class="panel">
+      <div class="ph"><span class="pt">Transaction Volume - Last 20</span><span class="pb b" id="chart-badge">LOADING</span></div>
+      <div class="ca">
+        <div class="bchart" id="bchart"></div>
+        <div class="cax" id="cax"></div>
+        <div class="cleg">
+          <div class="li"><div class="ld" style="background:var(--green)"></div>ALLOW</div>
+          <div class="li"><div class="ld" style="background:var(--amber)"></div>FLAG</div>
+          <div class="li"><div class="ld" style="background:var(--red)"></div>BLOCK</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span class="pt">Fraud Alerts</span><span class="pb r" id="al-badge">0 ACTIVE</span></div>
+      <div class="alist" id="alist"><div class="es">No active alerts</div></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:44px">
+    <div class="ph"><span class="pt">Transaction Feed</span><span class="pb b" id="tc-badge">0 TXN</span></div>
+    <div class="tcontrols">
+      <button class="fbtn active" onclick="setFilter('all',this)">ALL</button>
+      <button class="fbtn" onclick="setFilter('block',this)">BLOCKED</button>
+      <button class="fbtn" onclick="setFilter('flag',this)">FLAGGED</button>
+      <button class="fbtn" onclick="setFilter('allow',this)">ALLOWED</button>
+      <input class="srch" type="text" placeholder="Search merchant / card..." oninput="setSearch(this.value)">
+    </div>
+    <div class="tscroll">
+      <table class="txntable">
+        <thead><tr><th>TXN ID</th><th>CARD</th><th>MERCHANT</th><th>AMOUNT</th><th>COUNTRY</th><th>DECISION</th><th>FRAUD SCORE</th><th>TIME</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="8" class="es">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ========== TAB 2: MANUAL DETECTION ========== -->
+<div id="tab-manual" class="tab-panel">
+  <div class="dg">
+
+    <!-- Form -->
+    <div>
+      <div class="fsec">
+        <div class="ftitle">&#9654; Enter Transaction Details</div>
+        <div class="fgrid">
+          <div class="fgrp">
+            <label class="flabel">Transaction ID</label>
+            <input class="finput" id="f-id" type="text" placeholder="TXN001" value="TXN001">
+          </div>
+          <div class="fgrp">
+            <label class="flabel">Card (last 4 digits)</label>
+            <input class="finput" id="f-card" type="text" placeholder="4242" value="4242">
+          </div>
+          <div class="fgrp">
+            <label class="flabel">Amount (Rs.)</label>
+            <input class="finput" id="f-amount" type="number" placeholder="e.g. 2500" min="0" step="0.01">
+          </div>
+          <div class="fgrp">
+            <label class="flabel">Merchant Name</label>
+            <input class="finput" id="f-merchant" type="text" placeholder="e.g. Amazon">
+          </div>
+          <div class="fgrp">
+            <label class="flabel">Merchant Category</label>
+            <select class="fsel" id="f-cat">
+              <option value="online">Online Shopping</option>
+              <option value="grocery">Grocery</option>
+              <option value="fuel">Fuel / Petrol</option>
+              <option value="atm">ATM Withdrawal</option>
+              <option value="travel">Travel / Hotel</option>
+            </select>
+          </div>
+          <div class="fgrp">
+            <label class="flabel">Country</label>
+            <select class="fsel" id="f-country">
+              <option value="IN">India (IN)</option>
+              <option value="US">USA (US)</option>
+              <option value="UK">UK (UK)</option>
+              <option value="SG">Singapore (SG)</option>
+              <option value="NG">Nigeria (NG)</option>
+              <option value="AE">UAE (AE)</option>
+              <option value="CN">China (CN)</option>
+            </select>
+          </div>
+          <div class="fgrp">
+            <label class="flabel">Hour of Day (0-23)</label>
+            <input class="finput" id="f-hour" type="number" min="0" max="23" placeholder="14" value="14">
+          </div>
+          <div class="fgrp">
+            <label class="flabel">Day Type</label>
+            <select class="fsel" id="f-weekend">
+              <option value="0">Weekday (Mon-Fri)</option>
+              <option value="1">Weekend (Sat-Sun)</option>
+            </select>
+          </div>
+        </div>
+        <button class="dbtn" id="dbtn" onclick="runDetect()">&#9654; &nbsp;ANALYSE TRANSACTION</button>
+      </div>
+
+      <div class="fsec">
+        <div class="ftitle">&#9670; Quick Test Presets</div>
+        <div class="presets">
+          <button class="pbtn secondary" onclick="loadPreset('normal')">Normal Transaction</button>
+          <button class="pbtn secondary" onclick="loadPreset('suspicious')">Suspicious (High Amount)</button>
+          <button class="pbtn secondary" onclick="loadPreset('fraud')">Likely Fraud (Overseas ATM)</button>
+          <button class="pbtn secondary" onclick="loadPreset('night')">Late Night Purchase</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div>
+      <div class="placeholder" id="r-placeholder">
+        <div style="font-size:32px;opacity:.3">&#128270;</div>
+        <div>Fill the form and click Analyse</div>
+        <div style="font-size:10px;color:var(--text3)">Verdict appears here</div>
+      </div>
+      <div id="r-card"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== TAB 3: BATCH CSV ========== -->
+<div id="tab-batch" class="tab-panel">
+  <div class="panel">
+    <div class="ph">
+      <span class="pt">&#8679; Upload CSV for Batch Detection</span>
+      <button class="pbtn secondary" onclick="dlTemplate()">&#8681; Download Template CSV</button>
+    </div>
+    <div style="padding:20px">
+
+      <div class="uzone" id="uzone"
+           onclick="document.getElementById('cfile').click()"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleDrop(event)">
+        <input type="file" id="cfile" accept=".csv" onchange="handleFile(this.files[0])">
+        <div style="font-size:28px;margin-bottom:10px;opacity:.5">&#128196;</div>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--text2)">Click to upload CSV or drag and drop</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px">
+          Required columns: transaction_id, amount, merchant_cat, country, hour_of_day, is_weekend
+        </div>
+      </div>
+
+      <div class="ccontrols" id="ccontrols" style="display:none">
+        <span class="cfname" id="cfname">-</span>
+        <button class="pbtn primary" id="bbtn" onclick="runBatch()">&#9654; Run Detection</button>
+        <button class="pbtn secondary" onclick="clearCsv()">&#10005; Clear</button>
+      </div>
+
+      <div class="pbar" id="pbar" style="display:none">
+        <div class="pfill" id="pfill" style="width:0%"></div>
+      </div>
+
+      <div class="csum" id="csum" style="display:none">
+        <div class="cstat"><div class="cstatval" id="csv-total">0</div><div class="cstatlabel">Total</div></div>
+        <div class="cstat"><div class="cstatval r" id="csv-blocked">0</div><div class="cstatlabel">Blocked</div></div>
+        <div class="cstat"><div class="cstatval a" id="csv-flagged">0</div><div class="cstatlabel">Flagged</div></div>
+        <div class="cstat"><div class="cstatval g" id="csv-allowed">0</div><div class="cstatlabel">Allowed</div></div>
+      </div>
+
+      <div id="cresults" style="display:none;margin-top:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-family:var(--mono);font-size:11px;color:var(--text2)" id="crlabel"></span>
+          <button class="pbtn secondary" onclick="dlResults()">&#8681; Export Results CSV</button>
+        </div>
+        <div class="crs">
+          <table class="txntable">
+            <thead>
+              <tr><th>TXN ID</th><th>AMOUNT</th><th>CATEGORY</th><th>COUNTRY</th><th>HOUR</th><th>DECISION</th><th>SCORE</th><th>RISK</th><th>FACTORS</th></tr>
+            </thead>
+            <tbody id="ctbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:44px">
+    <div class="ph"><span class="pt">CSV Format Guide</span></div>
+    <div style="padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:10px">Required columns:</div>
+        <table class="txntable"><thead><tr><th>Column</th><th>Type</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">transaction_id</td><td class="dim">text</td><td class="dim">TXN001</td></tr>
+          <tr><td class="mono">amount</td><td class="dim">number</td><td class="dim">2500.00</td></tr>
+          <tr><td class="mono">merchant_cat</td><td class="dim">text</td><td class="dim">online / atm / fuel / grocery / travel</td></tr>
+          <tr><td class="mono">country</td><td class="dim">text</td><td class="dim">IN / US / UK / NG / SG / AE / CN</td></tr>
+          <tr><td class="mono">hour_of_day</td><td class="dim">0-23</td><td class="dim">14</td></tr>
+          <tr><td class="mono">is_weekend</td><td class="dim">0 or 1</td><td class="dim">0</td></tr>
+        </tbody></table>
+      </div>
+      <div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:10px">Optional columns:</div>
+        <table class="txntable"><thead><tr><th>Column</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">card_id</td><td class="dim">Card identifier</td></tr>
+          <tr><td class="mono">merchant_name</td><td class="dim">Display name</td></tr>
+        </tbody></table>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:14px;line-height:1.7">
+          Download the template CSV above for a ready-to-fill sample file with 5 example rows.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="statusbar">
+  <span>FRAUDSENTINEL v2.0</span>
+  <span>MODEL: <span id="s-model">LOADING</span></span>
+  <span>REFRESH: <span>5s</span></span>
+  <span>LATENCY: <span id="s-lat">-</span>ms</span>
+  <span>LAST UPDATE: <span id="s-last">-</span></span>
+</div>
+
+<script>
+// ---- State ------------------------------------------------------------------
+var allTxns = [], liveFilter = 'all', searchQ = '', csvData = [], batchResults = [];
+var FLAGS = {IN:'IN',US:'US',UK:'UK',SG:'SG',NG:'NG',AE:'AE',CN:'CN'};
+
+// ---- Clock ------------------------------------------------------------------
+function tickClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-GB', {hour12:false});
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+// ---- Tabs -------------------------------------------------------------------
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ---- Live feed --------------------------------------------------------------
+function fetchLive() {
+  var t0 = performance.now();
+  fetch('/api/transactions')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var lat = Math.round(performance.now() - t0);
+      allTxns = data.transactions;
+      var m = data.metrics;
+      document.getElementById('m-total').textContent   = m.total.toLocaleString();
+      document.getElementById('m-win').textContent     = m.total;
+      document.getElementById('m-blocked').textContent = m.blocked;
+      document.getElementById('m-flagged').textContent = m.flagged;
+      document.getElementById('m-allowed').textContent = m.allowed;
+      document.getElementById('m-bpct').textContent    = m.block_rate + '%';
+      document.getElementById('m-fpct').textContent    = m.flag_rate  + '%';
+      document.getElementById('m-apct').textContent    = m.allow_rate + '%';
+      document.getElementById('m-avg').textContent     = m.avg_score;
+      document.getElementById('s-lat').textContent     = lat;
+      document.getElementById('s-last').textContent    =
+        new Date().toLocaleTimeString('en-GB', {hour12:false});
+
+      if (data.models_loaded) {
+        document.getElementById('mbadge').textContent  = 'ML MODELS ACTIVE';
+        document.getElementById('mbadge').className    = 'mbadge ml';
+        document.getElementById('s-model').textContent = 'IF + GBM ENSEMBLE';
+      } else {
+        document.getElementById('s-model').textContent = 'RULE-BASED FALLBACK';
+      }
+      renderChart(allTxns.slice(0, 20));
+      renderAlerts(allTxns.filter(function(t) { return t.decision !== 'allow'; }).slice(0, 12));
+      renderTable();
+    })
+    .catch(function(e) { console.error('fetchLive error', e); });
+}
+
+function renderChart(txns) {
+  var rec = txns.slice().reverse();
+  var maxAmt = 1;
+  rec.forEach(function(t) { if (t.amount > maxAmt) maxAmt = t.amount; });
+  document.getElementById('bchart').innerHTML = rec.map(function(t) {
+    var pct = Math.max(4, Math.round((t.amount / maxAmt) * 100));
+    return '<div class="bwrap"><div class="bar ' + t.decision + '" style="height:' + pct + '%" data-tip="Rs.' + t.amount.toLocaleString() + ' - ' + t.decision.toUpperCase() + '"></div></div>';
+  }).join('');
+  document.getElementById('cax').innerHTML = rec.map(function(t, i) {
+    return '<span>' + (i % 4 === 0 ? t.ts : '') + '</span>';
+  }).join('');
+  document.getElementById('chart-badge').textContent = rec.length + ' TXN';
+}
+
+function renderAlerts(alerts) {
+  document.getElementById('al-badge').textContent = alerts.length + ' ACTIVE';
+  if (!alerts.length) {
+    document.getElementById('alist').innerHTML = '<div class="es">No active alerts</div>';
+    return;
+  }
+  document.getElementById('alist').innerHTML = alerts.map(function(t) {
+    return '<div class="aitem">' +
+      '<div class="aicon ' + t.decision + '">' + (t.decision === 'block' ? 'X' : '!') + '</div>' +
+      '<div class="abody"><div class="amerch">' + t.merchant + '</div>' +
+      '<div class="adetail">' + t.card + ' - ' + t.country + ' - ' + t.ts + '</div></div>' +
+      '<div class="ascore ' + t.decision + '">' + (t.score * 100).toFixed(0) + '%</div>' +
+      '</div>';
+  }).join('');
+}
+
+function setFilter(f, btn) {
+  liveFilter = f;
+  document.querySelectorAll('.fbtn').forEach(function(b) {
+    b.classList.remove('active', 'ar', 'aa', 'ag');
+  });
+  if (f === 'all')   btn.classList.add('active');
+  if (f === 'block') btn.classList.add('ar');
+  if (f === 'flag')  btn.classList.add('aa');
+  if (f === 'allow') btn.classList.add('ag');
+  renderTable();
+}
+
+function setSearch(q) { searchQ = q.toLowerCase(); renderTable(); }
+
+function renderTable() {
+  var txns = allTxns;
+  if (liveFilter !== 'all') txns = txns.filter(function(t) { return t.decision === liveFilter; });
+  if (searchQ) txns = txns.filter(function(t) {
+    return t.merchant.toLowerCase().indexOf(searchQ) >= 0 ||
+           t.card.indexOf(searchQ) >= 0 ||
+           t.id.toLowerCase().indexOf(searchQ) >= 0;
+  });
+  document.getElementById('tc-badge').textContent = txns.length + ' TXN';
+  if (!txns.length) {
+    document.getElementById('tbody').innerHTML = '<tr><td colspan="8" class="es">No transactions match</td></tr>';
+    return;
+  }
+  document.getElementById('tbody').innerHTML = txns.slice(0, 60).map(function(t) {
+    var c = t.score > 0.7 ? 'var(--red)' : t.score > 0.45 ? 'var(--amber)' : 'var(--green)';
+    var pct = Math.round(t.score * 100);
+    var rc  = t.decision === 'block' ? 'ib' : t.decision === 'flag' ? 'if2' : '';
+    return '<tr class="' + rc + '">' +
+      '<td class="mono" style="color:var(--text2)">' + t.id + '</td>' +
+      '<td class="mono">' + t.card + '</td>' +
+      '<td style="font-weight:500">' + t.merchant + '</td>' +
+      '<td class="mono" style="color:#fff;font-weight:600">Rs.' + Number(t.amount).toLocaleString('en-IN', {minimumFractionDigits:2}) + '</td>' +
+      '<td class="dim">' + t.country + '</td>' +
+      '<td><span class="dp ' + t.decision + '">' + t.decision.toUpperCase() + '</span></td>' +
+      '<td><div class="sbc"><div class="str"><div class="sfill" style="width:' + pct + '%;background:' + c + '"></div></div><span class="snum" style="color:' + c + '">' + t.score.toFixed(3) + '</span></div></td>' +
+      '<td class="dim">' + t.ts + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+fetchLive();
+setInterval(fetchLive, 5000);
+
+// ---- Manual detection -------------------------------------------------------
+function runDetect() {
+  var btn = document.getElementById('dbtn');
+  btn.disabled = true;
+  btn.textContent = 'Analysing...';
+
+  var payload = {
+    transaction_id: document.getElementById('f-id').value      || 'TXN001',
+    card_id:        '....' + document.getElementById('f-card').value,
+    amount:         parseFloat(document.getElementById('f-amount').value)  || 0,
+    merchant_name:  document.getElementById('f-merchant').value || 'Unknown',
+    merchant_cat:   document.getElementById('f-cat').value,
+    country:        document.getElementById('f-country').value,
+    hour_of_day:    parseInt(document.getElementById('f-hour').value)    || 12,
+    is_weekend:     parseInt(document.getElementById('f-weekend').value) || 0,
+  };
+
+  fetch('/api/detect', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('Server returned ' + r.status);
+    return r.json();
+  })
+  .then(function(res) { showResult(res, payload); })
+  .catch(function(e) { alert('Error: ' + e.message); })
+  .finally(function() {
+    btn.disabled = false;
+    btn.textContent = 'ANALYSE TRANSACTION';
+  });
+}
+
+function showResult(res, payload) {
+  document.getElementById('r-placeholder').style.display = 'none';
+  var d  = res.decision;
+  var sc = res.fraud_score;
+  var c  = d === 'block' ? 'var(--red)' : d === 'flag' ? 'var(--amber)' : 'var(--green)';
+  var icon = d === 'block' ? 'X' : d === 'flag' ? '!' : 'OK';
+  var factors = res.factors || [];
+  var ifScore = typeof res.model_scores.isolation_forest  === 'number' ? res.model_scores.isolation_forest.toFixed(4)  : res.model_scores.isolation_forest;
+  var gbScore = typeof res.model_scores.gradient_boosting === 'number' ? res.model_scores.gradient_boosting.toFixed(4) : res.model_scores.gradient_boosting;
+
+  document.getElementById('r-card').innerHTML =
+    '<div class="rcard ' + d + '">' +
+      '<div class="rverdict">' +
+        '<div class="vicon ' + d + '">' + icon + '</div>' +
+        '<div>' +
+          '<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:4px">DECISION</div>' +
+          '<div class="vdecision ' + d + '">' + d.toUpperCase() + '</div>' +
+        '</div>' +
+        '<div style="margin-left:auto;text-align:right">' +
+          '<div style="font-family:var(--mono);font-size:10px;color:var(--text3)">RISK LEVEL</div>' +
+          '<div style="font-family:var(--mono);font-size:14px;font-weight:700;color:' + c + '">' + res.risk_level + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="sdisp">' +
+        '<div class="sbig" style="color:' + c + '">' + (sc * 100).toFixed(1) + '%</div>' +
+        '<div style="flex:1">' +
+          '<div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:5px;letter-spacing:.08em">FRAUD PROBABILITY</div>' +
+          '<div class="sbbar"><div class="sbfill" style="width:' + Math.round(sc * 100) + '%;background:' + c + '"></div></div>' +
+          '<div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:4px">' + res.scoring_source + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="rrow">' +
+        '<div class="ri"><div class="rilabel">Transaction ID</div><div class="rival">' + res.transaction_id + '</div></div>' +
+        '<div class="ri"><div class="rilabel">Card</div><div class="rival">' + res.card_id + '</div></div>' +
+        '<div class="ri"><div class="rilabel">Amount</div><div class="rival" style="color:#fff;font-weight:600">Rs.' + Number(payload.amount).toLocaleString('en-IN', {minimumFractionDigits:2}) + '</div></div>' +
+        '<div class="ri"><div class="rilabel">Country</div><div class="rival">' + payload.country + '</div></div>' +
+        '<div class="ri"><div class="rilabel">IF Score</div><div class="rival">' + ifScore + '</div></div>' +
+        '<div class="ri"><div class="rilabel">GB Score</div><div class="rival">' + gbScore + '</div></div>' +
+      '</div>' +
+      '<div class="flist">' +
+        '<div class="flist-title">Risk Factors</div>' +
+        factors.map(function(f) {
+          return '<span class="ftag ' + (f.indexOf('No significant') >= 0 ? 'ok' : '') + '">' + f + '</span>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+}
+
+function loadPreset(type) {
+  var presets = {
+    normal:     {id:'TXN-NORM',  card:'1111', amount:250,  merch:'Swiggy',       cat:'online', co:'IN', hour:13, wknd:0},
+    suspicious: {id:'TXN-SUSP',  card:'2222', amount:4500, merch:'Amazon',       cat:'online', co:'US', hour:11, wknd:0},
+    fraud:      {id:'TXN-FRAU',  card:'3333', amount:3800, merch:'ATM Nigeria',  cat:'atm',    co:'NG', hour:3,  wknd:1},
+    night:      {id:'TXN-NIGHT', card:'4444', amount:1200, merch:'MakeMyTrip',   cat:'travel', co:'IN', hour:2,  wknd:0}
+  };
+  var p = presets[type];
+  document.getElementById('f-id').value      = p.id;
+  document.getElementById('f-card').value    = p.card;
+  document.getElementById('f-amount').value  = p.amount;
+  document.getElementById('f-merchant').value= p.merch;
+  document.getElementById('f-cat').value     = p.cat;
+  document.getElementById('f-country').value = p.co;
+  document.getElementById('f-hour').value    = p.hour;
+  document.getElementById('f-weekend').value = p.wknd;
+}
+
+// ---- CSV batch --------------------------------------------------------------
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uzone').classList.remove('drag');
+  var f = e.dataTransfer.files[0];
+  if (f && f.name.toLowerCase().endsWith('.csv')) handleFile(f);
+  else alert('Please drop a .csv file');
+}
+
+function handleFile(file) {
+  if (!file) return;
+  document.getElementById('cfname').textContent =
+    file.name + '  (' + (file.size / 1024).toFixed(1) + ' KB)';
+  document.getElementById('ccontrols').style.display = 'flex';
+  document.getElementById('cresults').style.display  = 'none';
+  document.getElementById('csum').style.display      = 'none';
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var lines   = e.target.result.trim().split('\n');
+    var headers = lines[0].split(',').map(function(h) { return h.trim().toLowerCase(); });
+    csvData = lines.slice(1).filter(function(l) { return l.trim(); }).map(function(line) {
+      var vals = line.split(',');
+      var row  = {};
+      headers.forEach(function(h, i) { row[h] = (vals[i] || '').trim(); });
+      return row;
+    });
+    document.getElementById('cfname').textContent += '  -  ' + csvData.length + ' rows';
+  };
+  reader.readAsText(file);
+}
+
+function clearCsv() {
+  csvData = []; batchResults = [];
+  document.getElementById('cfile').value       = '';
+  document.getElementById('ccontrols').style.display = 'none';
+  document.getElementById('cresults').style.display  = 'none';
+  document.getElementById('csum').style.display      = 'none';
+}
+
+function runBatch() {
+  if (!csvData.length) { alert('Upload a CSV file first'); return; }
+  var btn = document.getElementById('bbtn');
+  btn.disabled = true;
+  var pbar = document.getElementById('pbar');
+  var pfill= document.getElementById('pfill');
+  pbar.style.display = 'block';
+  pfill.style.width  = '0%';
+
+  fetch('/api/detect/batch', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({transactions: csvData})
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('Server returned ' + r.status);
+    pfill.style.width = '80%';
+    return r.json();
+  })
+  .then(function(data) {
+    batchResults = data.results;
+    pfill.style.width = '100%';
+    setTimeout(function() { pbar.style.display = 'none'; }, 500);
+
+    var total   = batchResults.length;
+    var blocked = batchResults.filter(function(r) { return r.decision === 'block'; }).length;
+    var flagged = batchResults.filter(function(r) { return r.decision === 'flag';  }).length;
+    var allowed = batchResults.filter(function(r) { return r.decision === 'allow'; }).length;
+
+    document.getElementById('csv-total').textContent   = total;
+    document.getElementById('csv-blocked').textContent = blocked;
+    document.getElementById('csv-flagged').textContent = flagged;
+    document.getElementById('csv-allowed').textContent = allowed;
+    document.getElementById('csum').style.display      = 'grid';
+    document.getElementById('crlabel').textContent     =
+      total + ' transactions processed - ' + blocked + ' blocked, ' + flagged + ' flagged, ' + allowed + ' allowed';
+
+    document.getElementById('ctbody').innerHTML = batchResults.map(function(r) {
+      var sc  = r.fraud_score;
+      var c   = r.decision === 'block' ? 'var(--red)' : r.decision === 'flag' ? 'var(--amber)' : 'var(--green)';
+      var pct = Math.round(sc * 100);
+      var rc  = r.decision === 'block' ? 'ib' : r.decision === 'flag' ? 'if2' : '';
+      var facs= (r.factors || []).filter(function(f) { return f.indexOf('No significant') < 0; }).join(', ') || '-';
+      return '<tr class="' + rc + '">' +
+        '<td class="mono" style="color:var(--text2)">' + r.transaction_id + '</td>' +
+        '<td class="mono" style="color:#fff;font-weight:600">Rs.' + Number(r.amount || 0).toLocaleString('en-IN', {minimumFractionDigits:2}) + '</td>' +
+        '<td class="dim">' + (r.merchant_cat || '-') + '</td>' +
+        '<td class="dim">' + (r.country || '-') + '</td>' +
+        '<td class="dim">' + (r.hour_of_day || '-') + ':00</td>' +
+        '<td><span class="dp ' + r.decision + '">' + r.decision.toUpperCase() + '</span></td>' +
+        '<td><div class="sbc"><div class="str"><div class="sfill" style="width:' + pct + '%;background:' + c + '"></div></div><span class="snum" style="color:' + c + '">' + sc.toFixed(3) + '</span></div></td>' +
+        '<td><span style="font-family:var(--mono);font-size:10px;font-weight:700;color:' + c + '">' + r.risk_level + '</span></td>' +
+        '<td class="dim" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;font-size:10px">' + facs + '</td>' +
+        '</tr>';
+    }).join('');
+    document.getElementById('cresults').style.display = 'block';
+  })
+  .catch(function(e) {
+    alert('Error: ' + e.message);
+    pbar.style.display = 'none';
+  })
+  .finally(function() { btn.disabled = false; });
+}
+
+function dlResults() {
+  if (!batchResults.length) return;
+  var headers = ['transaction_id','amount','merchant_cat','country','hour_of_day','is_weekend','fraud_score','decision','risk_level','factors'];
+  var rows = batchResults.map(function(r) {
+    return [r.transaction_id, r.amount || '', r.merchant_cat || '', r.country || '',
+            r.hour_of_day || '', r.is_weekend || '', r.fraud_score, r.decision,
+            r.risk_level, (r.factors || []).join('; ')].join(',');
+  });
+  var blob = new Blob([[headers.join(',')].concat(rows).join('\n')], {type:'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fraud_detection_results.csv';
+  a.click();
+}
+
+function dlTemplate() {
+  var csv = 'transaction_id,amount,merchant_cat,country,hour_of_day,is_weekend,card_id,merchant_name\n' +
+            'TXN001,250.00,online,IN,14,0,card_1234,Amazon\n' +
+            'TXN002,3500.00,atm,NG,3,1,card_5678,ATM Withdrawal\n' +
+            'TXN003,85.50,grocery,IN,10,0,card_9012,Reliance Fresh\n' +
+            'TXN004,1200.00,travel,US,22,0,card_3456,MakeMyTrip\n' +
+            'TXN005,45.00,fuel,IN,8,0,card_7890,Shell Fuel';
+  var blob = new Blob([csv], {type:'text/csv'});
+  var a    = document.createElement('a');
+  a.href   = URL.createObjectURL(blob);
+  a.download = 'fraud_template.csv';
+  a.click();
+}
+</script>
+</body>
+</html>
